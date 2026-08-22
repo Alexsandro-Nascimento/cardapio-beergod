@@ -1,5 +1,6 @@
-package org.example;
+package org.example.domain.model;
 
+// CLASSE E ATRIBUTOS
 public class Produto {
     private Long id;
     private String nome;
@@ -8,6 +9,7 @@ public class Produto {
     private CategoriaProduto categoria;
     private boolean ativo;
 
+    // CONSTRUTOR
     public Produto(Long id, String nome, String descricao, double preco, CategoriaProduto categoria){
         this.id = id;
         this.nome = nome;
@@ -17,6 +19,7 @@ public class Produto {
         this.categoria = categoria;
     }
 
+    // GETTERS E SETTERS
     public Long getId(){
         return id;
     }
@@ -61,5 +64,13 @@ public class Produto {
     }
     public void setAtivo(boolean ativo){
         this.ativo = ativo;
+    }
+
+    // MÉTODOS
+    public void exibirDetalhes(){
+        IO.println("--- Resumo do Produto ---");
+        IO.println("Nome: "+ this.nome);
+        IO.println("Preço: "+ this.preco);
+        IO.println("Categoria: "+ this.categoria);
     }
 }
