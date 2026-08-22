@@ -5,12 +5,16 @@ public class Produto {
     private String nome;
     private String descricao;
     private double  preco;
+    private CategoriaProduto categoria;
+    private boolean ativo;
 
-    public Produto(Long id, String nome, String descricao, double preco){
+    public Produto(Long id, String nome, String descricao, double preco, CategoriaProduto categoria){
         this.id = id;
         this.nome = nome;
         this.descricao = descricao;
         this.preco = preco;
+        this.ativo = true;
+        this.categoria = categoria;
     }
 
     public Long getId(){
@@ -43,5 +47,19 @@ public class Produto {
         }else{
             IO.println("Erro: o preço do produto não pode ser negativo!");
         }
+    }
+
+    public CategoriaProduto getCategoria(){
+        return categoria;
+    }
+    public void setCategoria(CategoriaProduto categoria){
+        this.categoria = categoria;
+    }
+
+    public boolean isAtivo(){
+        return ativo;
+    }
+    public void setAtivo(boolean ativo){
+        this.ativo = ativo;
     }
 }
