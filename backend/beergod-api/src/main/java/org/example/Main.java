@@ -1,6 +1,7 @@
 package org.example;
 
 import org.example.domain.model.Bebida;
+import org.example.domain.model.Cardapio;
 import org.example.domain.model.CategoriaProduto;
 import org.example.domain.model.Produto;
 
@@ -12,15 +13,18 @@ public class Main {
         System.out.println("Produto novo: "+ coxinha.getNome());
 
         Bebida cerveja = new Bebida(2L, "Heineken", "Cerveja Pilsne Long Neck", 12.00, 330, "Heineken");
+        Cardapio cardapio = new Cardapio();
 
-        coxinha.exibirDetalhes();
-        IO.println();
-        cerveja.exibirDetalhes();
+        cardapio.adicionarProduto(coxinha);
+        cardapio.adicionarProduto(cerveja);
 
+        cardapio.exibirCardapio();
 
+        IO.println("TESTE DE EXCLUSÃO");
+        cardapio.removerProduto(2L);
+        cardapio.removerProduto(99L);
 
-
-
+        cardapio.exibirCardapio();
 
     }
 }
