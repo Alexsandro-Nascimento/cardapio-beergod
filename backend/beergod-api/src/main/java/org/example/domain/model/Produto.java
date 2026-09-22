@@ -1,4 +1,6 @@
 package org.example.domain.model;
+import org.example.domain.exception.RegraNegocioException;
+
 
 // CLASSE E ATRIBUTOS
 public class Produto {
@@ -11,12 +13,25 @@ public class Produto {
 
     // CONSTRUTOR
     public Produto(Long id, String nome, String descricao, double preco, CategoriaProduto categoria){
+        validar(nome, preco);
+
         this.id = id;
         this.nome = nome;
         this.descricao = descricao;
         this.preco = preco;
         this.ativo = true;
         this.categoria = categoria;
+    }
+
+    // MÉTODO PRIVADO DE VALIDAÇÃO
+    private void validar(String nome, double preco){
+        if(nome == null || nome.isBlank()){
+            throw new RegraNegocioException("O nome do produto é obrigatório!");
+        }
+
+        if(preco <= 0){
+            throw new RegraNegocioException("O valor do produto precisa ser maior que zero!");
+        }
     }
 
     // GETTERS E SETTERS
@@ -31,6 +46,9 @@ public class Produto {
         return nome;
     }
     public void setNome(String nome){
+        if(nome == null || nome.isBlank()){
+            throw new RegraNegocioException("O nome do produto é obrigatório!");
+        }
         this.nome = nome;
     }
 
@@ -45,11 +63,10 @@ public class Produto {
         return preco;
     }
     public void setPreco(double preco){
-        if (preco > 0){
-            this.preco = preco;
-        }else{
-            IO.println("Erro: o preço do produto não pode ser negativo!");
+        if (preco <= 0) {
+            throw new RegraNegocioException("O preço do produto deve ser maior que zero.");
         }
+        this.preco = preco;
     }
 
     public CategoriaProduto getCategoria(){
