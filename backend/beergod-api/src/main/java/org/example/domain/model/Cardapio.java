@@ -14,15 +14,15 @@ public class Cardapio {
     //MÉTODOS
     public void adicionarProduto(Produto produto){
         this.produtos.add(produto);
-        IO.println(produto.getNome()+" foi adicionado ao cardápio!");
+        System.out.println(produto.getNome()+" foi adicionado ao cardápio!");
     }
 
     public void exibirCardapio(){
-        IO.println("\n=== CARDÁPIO ===");
+        System.out.println("\n=== CARDÁPIO ===");
 
         for(Produto produto : produtos){
             produto.exibirDetalhes();
-            IO.println("---------------------------");
+            System.out.println("---------------------------");
         }
     }
 
@@ -40,9 +40,9 @@ public class Cardapio {
 
         if (produtoEncontrado != null){
             produtos.remove(produtoEncontrado);
-            IO.println("O produto " + produtoEncontrado.getNome() + " foi removido!");
+            System.out.println("O produto " + produtoEncontrado.getNome() + " foi removido!");
         }else{
-            IO.println("Erro: Produto com ID " + id + " não encontrado!");
+            System.out.println("Erro: Produto com ID " + id + " não encontrado!");
         }
     }
 }

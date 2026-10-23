@@ -3,12 +3,14 @@ package org.example.infrastructure.persistence.postgres;
 import org.example.domain.model.Bebida;
 import org.example.domain.model.Produto;
 import org.example.domain.repository.ProdutoRepository;
+import org.springframework.stereotype.Repository;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public class PostgresProdutoRepository implements ProdutoRepository {
 
     @Override
