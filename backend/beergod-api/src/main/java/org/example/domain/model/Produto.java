@@ -85,9 +85,9 @@ public class Produto {
 
     // MÉTODOS
     public void exibirDetalhes(){
-        IO.println("--- Resumo do Produto ---");
-        IO.println("Nome: "+ this.nome);
-        IO.println("Preço: "+ this.preco);
-        IO.println("Categoria: "+ this.categoria);
+        System.out.println("--- Resumo do Produto ---");
+        System.out.println("Nome: "+ this.nome);
+        System.out.println("Preço: "+ this.preco);
+        System.out.println("Categoria: "+ this.categoria);
     }
 }

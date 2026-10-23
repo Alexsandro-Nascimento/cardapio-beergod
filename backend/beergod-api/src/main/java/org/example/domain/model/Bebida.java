@@ -52,10 +52,10 @@ public class Bebida extends Produto{
     // MÉTODOS
     @Override
     public void exibirDetalhes(){
-        IO.println("--- Resumo do Produto ---");
-        IO.println("Nome: "+ getNome());
-        IO.println("Preço: "+ getPreco());
-        IO.println("Tamanho: "+ this.tamanhoML);
-        IO.println("Marca: "+ this.marca);
+        System.out.println("--- Resumo do Produto ---");
+        System.out.println("Nome: "+ getNome());
+        System.out.println("Preço: "+ getPreco());
+        System.out.println("Tamanho: "+ this.tamanhoML);
+        System.out.println("Marca: "+ this.marca);
     }
 }
