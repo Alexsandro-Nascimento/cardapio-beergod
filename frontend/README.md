@@ -81,6 +81,10 @@ Todas as requisições utilizam essa constante. Quando for realizar deploy em pr
 - **Navegação por 3 Abas:**
   - **Aba 1: Produtos & Bebidas**
     - Listagem completa via `GET /produtos` com indicador de status (Ativo/Inativo), filtros rápidos por texto, categoria e status.
+    - **Seleção & Ações em Lote (Batch Actions):** Checkboxes em cada linha e checkbox mestre no cabeçalho. Barra de ações flutuante com contador em tempo real exibindo ações em lote executadas em paralelo via `Promise.all`:
+      - **Alterar Preço:** modal para definir novo valor em R$ para todos os itens selecionados.
+      - **Ativar:** ativação em lote com confirmação.
+      - **Inativar:** inativação em lote com confirmação.
     - Modal de Criação (`POST /produtos`) e Edição (`PUT /produtos/{id}`).
     - Switch dinâmico **"É uma Bebida?"**: quando ativado, exibe e exige os campos `tamanhoML` e `marca`. Quando desmarcado, envia `tamanhoML: null` e `marca: null`.
     - Pré-visualização ao vivo da URL da imagem.
