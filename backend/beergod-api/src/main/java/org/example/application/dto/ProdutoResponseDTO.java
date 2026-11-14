@@ -1,11 +1,18 @@
 package org.example.application.dto;
 
+import java.math.BigDecimal;
+
 public record ProdutoResponseDTO(
         Long id,
         String nome,
         String descricao,
-        Double preco,
-        String categoria,
+        BigDecimal preco,
+        String imagemUrl,
+        boolean ativo,
+        Long categoriaId,
+        String categoriaNome,
+        String tipo,
         Integer tamanhoML,
         String marca
-) {}
+) {
+}

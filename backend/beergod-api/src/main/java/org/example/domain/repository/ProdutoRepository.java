@@ -6,7 +6,7 @@ import java.util.Optional;
 
 public interface ProdutoRepository {
     Produto salvar(Produto produto);
+    void atualizar(Produto produto);
     Optional<Produto> buscarPorId(Long id);
-    List<Produto> buscarTodos();
-    void deletar(Long id);
+    List<Produto> listarTodos(boolean apenasAtivos);
 }

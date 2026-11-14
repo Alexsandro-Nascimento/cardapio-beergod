@@ -1,31 +1,37 @@
 package org.example.infrastructure.config;
-import org.example.application.usecase.BuscarProdutoPorIdUseCase;
-import org.example.application.usecase.CadastrarProdutoUseCase;
-import org.example.application.usecase.DeletarProdutoUseCase;
+
+import org.example.application.usecase.AtualizarProdutoUseCase;
+import org.example.application.usecase.CriarProdutoUseCase;
+import org.example.application.usecase.InativarProdutoUseCase;
 import org.example.application.usecase.ListarProdutosUseCase;
+import org.example.domain.repository.CategoriaRepository;
 import org.example.domain.repository.ProdutoRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class ProdutoConfig {
+
     @Bean
-    public CadastrarProdutoUseCase cadastrarProdutoUseCase(ProdutoRepository produtoRepository) {
-        return new CadastrarProdutoUseCase(produtoRepository);
+    public CriarProdutoUseCase criarProdutoUseCase(ProdutoRepository produtoRepository,
+                                                   CategoriaRepository categoriaRepository) {
+        return new CriarProdutoUseCase(produtoRepository, categoriaRepository);
     }
 
     @Bean
-    public BuscarProdutoPorIdUseCase buscarProdutoPorIdUseCase(ProdutoRepository produtoRepository) {
-        return new BuscarProdutoPorIdUseCase(produtoRepository);
+    public ListarProdutosUseCase listarProdutosUseCase(ProdutoRepository produtoRepository,
+                                                       CategoriaRepository categoriaRepository) {
+        return new ListarProdutosUseCase(produtoRepository, categoriaRepository);
     }
 
     @Bean
-    public ListarProdutosUseCase listarProdutosUseCase(ProdutoRepository produtoRepository) {
-        return new ListarProdutosUseCase(produtoRepository);
+    public AtualizarProdutoUseCase atualizarProdutoUseCase(ProdutoRepository produtoRepository,
+                                                           CategoriaRepository categoriaRepository) {
+        return new AtualizarProdutoUseCase(produtoRepository, categoriaRepository);
     }
 
     @Bean
-    public DeletarProdutoUseCase deletarProdutoUseCase(ProdutoRepository produtoRepository) {
-        return new DeletarProdutoUseCase(produtoRepository);
+    public InativarProdutoUseCase inativarProdutoUseCase(ProdutoRepository produtoRepository) {
+        return new InativarProdutoUseCase(produtoRepository);
     }
 }

@@ -1,16 +1,14 @@
 package org.example.infrastructure.controller;
 
-import org.example.application.dto.CriarProdutoDTO;
+import org.example.application.dto.ProdutoRequestDTO;
 import org.example.application.dto.ProdutoResponseDTO;
-import org.example.application.usecase.BuscarProdutoPorIdUseCase;
-import org.example.application.usecase.CadastrarProdutoUseCase;
-import org.example.application.usecase.DeletarProdutoUseCase;
+import org.example.application.usecase.AtualizarProdutoUseCase;
+import org.example.application.usecase.CriarProdutoUseCase;
+import org.example.application.usecase.InativarProdutoUseCase;
 import org.example.application.usecase.ListarProdutosUseCase;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.RequestBody;
-
 
 import java.util.List;
 
@@ -18,39 +16,41 @@ import java.util.List;
 @RequestMapping("/produtos")
 public class ProdutoController {
 
-    private final CadastrarProdutoUseCase cadastrarProdutoUseCase;
-    private final BuscarProdutoPorIdUseCase buscarProdutoPorIdUseCase;
+    private final CriarProdutoUseCase criarProdutoUseCase;
     private final ListarProdutosUseCase listarProdutosUseCase;
-    private final DeletarProdutoUseCase deletarProdutoUseCase;
+    private final AtualizarProdutoUseCase atualizarProdutoUseCase;
+    private final InativarProdutoUseCase inativarProdutoUseCase;
 
-    public ProdutoController(CadastrarProdutoUseCase cadastrarProdutoUseCase, BuscarProdutoPorIdUseCase buscarProdutoPorIdUseCase, ListarProdutosUseCase listarProdutosUseCase, DeletarProdutoUseCase deletarProdutoUseCase) {
-        this.cadastrarProdutoUseCase = cadastrarProdutoUseCase;
-        this.buscarProdutoPorIdUseCase = buscarProdutoPorIdUseCase;
+    public ProdutoController(CriarProdutoUseCase criarProdutoUseCase,
+                             ListarProdutosUseCase listarProdutosUseCase,
+                             AtualizarProdutoUseCase atualizarProdutoUseCase,
+                             InativarProdutoUseCase inativarProdutoUseCase) {
+        this.criarProdutoUseCase = criarProdutoUseCase;
         this.listarProdutosUseCase = listarProdutosUseCase;
-        this.deletarProdutoUseCase = deletarProdutoUseCase;
+        this.atualizarProdutoUseCase = atualizarProdutoUseCase;
+        this.inativarProdutoUseCase = inativarProdutoUseCase;
     }
 
     @PostMapping
-    public ResponseEntity<ProdutoResponseDTO> cadastrar(@RequestBody CriarProdutoDTO dto){
-        ProdutoResponseDTO response = cadastrarProdutoUseCase.executar(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    public ResponseEntity<ProdutoResponseDTO> criar(@RequestBody ProdutoRequestDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(criarProdutoUseCase.executar(dto));
     }
 
     @GetMapping
-    public ResponseEntity<List<ProdutoResponseDTO>> listar() {
-        List<ProdutoResponseDTO> produtos = listarProdutosUseCase.executar();
-        return ResponseEntity.ok(produtos);
+    public ResponseEntity<List<ProdutoResponseDTO>> listar(
+            @RequestParam(defaultValue = "false") boolean apenasAtivos) {
+        return ResponseEntity.ok(listarProdutosUseCase.executar(apenasAtivos));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ProdutoResponseDTO> buscarPorId(@PathVariable Long id) {
-        ProdutoResponseDTO response = buscarProdutoPorIdUseCase.executar(id);
-        return ResponseEntity.ok(response);
+    @PutMapping("/{id}")
+    public ResponseEntity<ProdutoResponseDTO> atualizar(@PathVariable Long id,
+                                                        @RequestBody ProdutoRequestDTO dto) {
+        return ResponseEntity.ok(atualizarProdutoUseCase.executar(id, dto));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Long id) {
-        deletarProdutoUseCase.executar(id);
+    public ResponseEntity<Void> inativar(@PathVariable Long id) {
+        inativarProdutoUseCase.executar(id);
         return ResponseEntity.noContent().build();
     }
 }
