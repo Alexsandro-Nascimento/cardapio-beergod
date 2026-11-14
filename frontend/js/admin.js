@@ -36,6 +36,9 @@ let produtosList = [];
 let categoriasList = [];
 let administradoresList = [];
 
+// Batch Selection State
+let selectedProdutoIds = new Set();
+
 // Edit / Modal State
 let editingProdutoId = null;
 let editingCategoriaId = null;
@@ -227,10 +230,14 @@ function switchTab(tabName) {
   // Trigger data load
   if (tabName === "produtos") {
     loadProdutosData();
-  } else if (tabName === "categorias") {
-    loadCategoriasData();
-  } else if (tabName === "administradores") {
-    loadAdministradoresData();
+  } else {
+    selectedProdutoIds.clear();
+    updateBatchActionsBar();
+    if (tabName === "categorias") {
+      loadCategoriasData();
+    } else if (tabName === "administradores") {
+      loadAdministradoresData();
+    }
   }
 }
 
@@ -240,7 +247,7 @@ function switchTab(tabName) {
 async function loadProdutosData() {
   const tableBody = document.getElementById("produtos-table-body");
   if (tableBody) {
-    tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">Carregando catálogo de produtos...</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">Carregando catálogo de produtos...</td></tr>`;
   }
 
   try {
@@ -250,6 +257,7 @@ async function loadProdutosData() {
     produtosList = Array.isArray(prods) ? prods : [];
     categoriasList = Array.isArray(cats) ? cats : [];
 
+    selectedProdutoIds.clear();
     populateCategorySelectOptions();
     renderProdutosTable();
     updateProdutosCountBadge();
@@ -257,7 +265,7 @@ async function loadProdutosData() {
     console.error("Erro ao carregar produtos:", err);
     toast.error(err.message || "Erro ao carregar lista de produtos.");
     if (tableBody) {
-      tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-rose-400 font-semibold">${escapeHtml(
+      tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-400 font-semibold">${escapeHtml(
         err.message
       )}</td></tr>`;
     }
@@ -289,12 +297,8 @@ function populateCategorySelectOptions() {
   }
 }
 
-function renderProdutosTable() {
-  const tableBody = document.getElementById("produtos-table-body");
-  const mobileCardsContainer = document.getElementById("produtos-mobile-cards");
-  if (!tableBody) return;
-
-  const filtered = produtosList.filter((prod) => {
+function getFilteredProdutos() {
+  return produtosList.filter((prod) => {
     // Search by name, brand, or category
     const matchSearch =
       produtoSearch === "" ||
@@ -315,11 +319,91 @@ function renderProdutosTable() {
 
     return matchSearch && matchCat && matchStatus;
   });
+}
+
+function updateBatchActionsBar(filtered = null) {
+  const bar = document.getElementById("produtos-batch-bar");
+  const countEl = document.getElementById("batch-selected-count");
+  const selectAll = document.getElementById("select-all-produtos");
+
+  const totalSelected = selectedProdutoIds.size;
+  if (countEl) countEl.textContent = totalSelected;
+
+  if (bar) {
+    if (totalSelected > 0) {
+      bar.classList.remove("hidden");
+    } else {
+      bar.classList.add("hidden");
+    }
+  }
+
+  if (selectAll) {
+    if (!filtered) filtered = getFilteredProdutos();
+    if (filtered.length === 0) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+    } else {
+      const selectedFilteredCount = filtered.filter((p) => selectedProdutoIds.has(p.id)).length;
+      if (selectedFilteredCount === 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+      } else if (selectedFilteredCount === filtered.length) {
+        selectAll.checked = true;
+        selectAll.indeterminate = false;
+      } else {
+        selectAll.checked = false;
+        selectAll.indeterminate = true;
+      }
+    }
+  }
+}
+
+async function executeBatchUpdate(changes, successActionText) {
+  const ids = Array.from(selectedProdutoIds);
+  if (ids.length === 0) return;
+
+  try {
+    const promises = ids.map((id) => {
+      const prod = produtosList.find((p) => p.id === id);
+      if (!prod) return Promise.resolve();
+
+      const isBebida = prod.tipo === "BEBIDA";
+      const payload = {
+        nome: prod.nome,
+        descricao: prod.descricao,
+        preco: changes.preco !== undefined ? changes.preco : prod.preco,
+        imagemUrl: prod.imagemUrl,
+        categoriaId: prod.categoriaId,
+        isBebida: isBebida,
+        tamanhoML: isBebida ? prod.tamanhoML : null,
+        marca: isBebida ? prod.marca : null,
+        ativo: changes.ativo !== undefined ? changes.ativo : prod.ativo,
+      };
+
+      return atualizarProduto(id, payload);
+    });
+
+    await Promise.all(promises);
+    toast.success(`${successActionText} ${ids.length} produto(s)!`);
+    selectedProdutoIds.clear();
+    await loadProdutosData();
+  } catch (err) {
+    console.error("Erro na atualização em lote:", err);
+    toast.error(err.message || "Erro ao processar atualização em lote.");
+  }
+}
+
+function renderProdutosTable() {
+  const tableBody = document.getElementById("produtos-table-body");
+  const mobileCardsContainer = document.getElementById("produtos-mobile-cards");
+  if (!tableBody) return;
+
+  const filtered = getFilteredProdutos();
 
   if (filtered.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="7" class="text-center py-12 text-slate-400">
+        <td colspan="8" class="text-center py-12 text-slate-400">
           <div class="flex flex-col items-center justify-center">
             <svg class="w-10 h-10 text-slate-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -334,6 +418,7 @@ function renderProdutosTable() {
         <div class="text-center py-8 text-slate-400 text-sm">Nenhum produto encontrado.</div>
       `;
     }
+    updateBatchActionsBar(filtered);
     return;
   }
 
@@ -341,12 +426,26 @@ function renderProdutosTable() {
   tableBody.innerHTML = filtered
     .map((prod) => {
       const isBebida = prod.tipo === "BEBIDA";
+      const isSelected = selectedProdutoIds.has(prod.id);
       const imageSrc = prod.imagemUrl && prod.imagemUrl.trim().length > 0
         ? escapeHtml(prod.imagemUrl)
         : getPlaceholderImage(prod.nome, isBebida);
 
       return `
-      <tr class="border-b border-slate-700/60 hover:bg-slate-800/50 transition-colors">
+      <tr class="border-b border-slate-700/60 hover:bg-slate-800/50 transition-colors ${
+        isSelected ? "bg-amber-500/10" : ""
+      }">
+        <!-- Checkbox Selection -->
+        <td class="w-10 py-3 px-4 text-center">
+          <input
+            type="checkbox"
+            data-produto-id="${prod.id}"
+            class="produto-row-checkbox w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700 cursor-pointer accent-amber-500"
+            ${isSelected ? "checked" : ""}
+            title="Selecionar produto"
+          />
+        </td>
+
         <!-- Image & Name -->
         <td class="py-3 px-4">
           <div class="flex items-center gap-3">
@@ -471,12 +570,28 @@ function renderProdutosTable() {
     mobileCardsContainer.innerHTML = filtered
       .map((prod) => {
         const isBebida = prod.tipo === "BEBIDA";
+        const isSelected = selectedProdutoIds.has(prod.id);
         const imageSrc = prod.imagemUrl && prod.imagemUrl.trim().length > 0
           ? escapeHtml(prod.imagemUrl)
           : getPlaceholderImage(prod.nome, isBebida);
 
         return `
-        <div class="p-4 rounded-xl bg-slate-800/80 border border-slate-700 flex flex-col gap-3">
+        <div class="p-4 rounded-xl bg-slate-800/80 border border-slate-700 flex flex-col gap-3 ${
+          isSelected ? "ring-2 ring-amber-500/60 bg-amber-500/5" : ""
+        }">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                data-produto-id="${prod.id}"
+                class="produto-row-checkbox w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700 cursor-pointer accent-amber-500"
+                ${isSelected ? "checked" : ""}
+              />
+              <span class="text-xs font-semibold text-slate-300">Selecionar item</span>
+            </label>
+            <span class="font-extrabold text-amber-400 font-serif-brand text-sm">${formatBRL(prod.preco)}</span>
+          </div>
+
           <div class="flex items-start gap-3">
             <img
               src="${imageSrc}"
@@ -485,10 +600,7 @@ function renderProdutosTable() {
               class="w-16 h-16 rounded-xl object-cover bg-slate-900 border border-slate-700 flex-shrink-0"
             />
             <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between gap-2">
-                <h4 class="font-bold text-slate-100 text-sm truncate">${escapeHtml(prod.nome)}</h4>
-                <span class="font-extrabold text-amber-400 font-serif-brand text-sm">${formatBRL(prod.preco)}</span>
-              </div>
+              <h4 class="font-bold text-slate-100 text-sm truncate">${escapeHtml(prod.nome)}</h4>
               <p class="text-xs text-slate-400 mt-1 line-clamp-1">${escapeHtml(prod.descricao) || "Sem descrição"}</p>
               <div class="flex items-center gap-2 mt-2">
                 <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">${escapeHtml(prod.categoriaNome || "Geral")}</span>
@@ -528,6 +640,37 @@ function renderProdutosTable() {
       })
       .join("");
   }
+
+  // Row checkbox change listeners
+  document.querySelectorAll(".produto-row-checkbox").forEach((cb) => {
+    cb.addEventListener("change", (e) => {
+      const id = Number(e.target.getAttribute("data-produto-id"));
+      if (e.target.checked) {
+        selectedProdutoIds.add(id);
+      } else {
+        selectedProdutoIds.delete(id);
+      }
+
+      // Sync checkbox state between desktop and mobile if rendered simultaneously
+      document.querySelectorAll(`.produto-row-checkbox[data-produto-id="${id}"]`).forEach((el) => {
+        el.checked = e.target.checked;
+      });
+
+      // Highlight row if desktop
+      const tr = e.target.closest("tr");
+      if (tr) {
+        if (e.target.checked) {
+          tr.classList.add("bg-amber-500/10");
+        } else {
+          tr.classList.remove("bg-amber-500/10");
+        }
+      }
+
+      updateBatchActionsBar(filtered);
+    });
+  });
+
+  updateBatchActionsBar(filtered);
 }
 
 function setupProductFormEvents() {
@@ -612,6 +755,129 @@ function setupProductFormEvents() {
   const form = document.getElementById("produto-form");
   if (form) {
     form.addEventListener("submit", handleProdutoSubmit);
+  }
+
+  // Setup Batch Actions Events
+  setupBatchActionsEvents();
+}
+
+function setupBatchActionsEvents() {
+  // Master checkbox
+  const selectAll = document.getElementById("select-all-produtos");
+  if (selectAll) {
+    selectAll.addEventListener("change", (e) => {
+      const isChecked = e.target.checked;
+      const filtered = getFilteredProdutos();
+      filtered.forEach((p) => {
+        if (isChecked) {
+          selectedProdutoIds.add(p.id);
+        } else {
+          selectedProdutoIds.delete(p.id);
+        }
+      });
+      document.querySelectorAll(".produto-row-checkbox").forEach((cb) => {
+        const id = Number(cb.getAttribute("data-produto-id"));
+        cb.checked = selectedProdutoIds.has(id);
+        const tr = cb.closest("tr");
+        if (tr) {
+          if (cb.checked) tr.classList.add("bg-amber-500/10");
+          else tr.classList.remove("bg-amber-500/10");
+        }
+      });
+      updateBatchActionsBar(filtered);
+    });
+  }
+
+  // Deselect all button
+  const deselectBtn = document.getElementById("batch-deselect-all-btn");
+  if (deselectBtn) {
+    deselectBtn.addEventListener("click", () => {
+      selectedProdutoIds.clear();
+      document.querySelectorAll(".produto-row-checkbox").forEach((cb) => {
+        cb.checked = false;
+        const tr = cb.closest("tr");
+        if (tr) tr.classList.remove("bg-amber-500/10");
+      });
+      updateBatchActionsBar();
+    });
+  }
+
+  // Batch Alterar Preço
+  const alterarPrecoBtn = document.getElementById("batch-alterar-preco-btn");
+  const modal = document.getElementById("batch-preco-modal");
+  const form = document.getElementById("batch-preco-form");
+  const closeBtn = document.getElementById("close-batch-preco-modal-btn");
+  const cancelBtn = document.getElementById("cancel-batch-preco-modal-btn");
+  const descEl = document.getElementById("batch-preco-desc");
+  const inputPreco = document.getElementById("batch-novo-preco");
+
+  if (alterarPrecoBtn && modal) {
+    alterarPrecoBtn.addEventListener("click", () => {
+      if (selectedProdutoIds.size === 0) return;
+      if (descEl) {
+        descEl.textContent = `Informe o novo valor a ser aplicado para os ${selectedProdutoIds.size} produto(s) selecionado(s).`;
+      }
+      if (form) form.reset();
+      modal.classList.remove("hidden");
+      if (inputPreco) inputPreco.focus();
+    });
+  }
+
+  const closePrecoModal = () => {
+    if (modal) modal.classList.add("hidden");
+  };
+
+  if (closeBtn) closeBtn.addEventListener("click", closePrecoModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closePrecoModal);
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const novoPreco = parseFloat(inputPreco.value);
+      if (isNaN(novoPreco) || novoPreco <= 0) {
+        toast.warning("Informe um preço válido maior que zero.");
+        return;
+      }
+
+      closePrecoModal();
+      await executeBatchUpdate({ preco: novoPreco }, `Preço alterado com sucesso em`);
+    });
+  }
+
+  // Batch Ativar
+  const ativarBtn = document.getElementById("batch-ativar-btn");
+  if (ativarBtn) {
+    ativarBtn.addEventListener("click", async () => {
+      if (selectedProdutoIds.size === 0) return;
+      const count = selectedProdutoIds.size;
+      const confirmed = await openConfirmDialog(
+        "Ativar em Lote",
+        `Deseja ativar os ${count} produto(s) selecionado(s)?`,
+        "Ativar Todos",
+        "success"
+      );
+      if (confirmed) {
+        await executeBatchUpdate({ ativo: true }, `Ativado(s) com sucesso`);
+      }
+    });
+  }
+
+  // Batch Inativar
+  const inativarBtn = document.getElementById("batch-inativar-btn");
+  if (inativarBtn) {
+    inativarBtn.addEventListener("click", async () => {
+      if (selectedProdutoIds.size === 0) return;
+      const count = selectedProdutoIds.size;
+      const confirmed = await openConfirmDialog(
+        "Inativar em Lote",
+        `Deseja inativar os ${count} produto(s) selecionado(s)? Eles não aparecerão mais no cardápio público dos clientes.`,
+        "Inativar Todos",
+        "danger"
+      );
+      if (confirmed) {
+        await executeBatchUpdate({ ativo: false }, `Inativado(s) com sucesso`);
+      }
+    });
   }
 }
 
