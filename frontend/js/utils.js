@@ -87,5 +87,5 @@ export function removeStoredAdmin() {
 
 export function isAuthenticated() {
   const admin = getStoredAdmin();
-  return Boolean(admin && admin.id && admin.email);
+  return Boolean(admin && admin.id && admin.email && admin.token);
 }

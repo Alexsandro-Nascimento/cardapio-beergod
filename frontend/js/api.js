@@ -1,15 +1,17 @@
 import { API_BASE_URL } from "./config.js";
+import { getStoredAdmin, removeStoredAdmin } from "./utils.js";
 
-/**
- * Generic HTTP request helper that parses JSON and handles HTTP errors,
- * specifically extracting `data.mensagem` from Spring Boot BAD_REQUEST (400) responses.
- */
 async function apiRequest(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
 
   const defaultHeaders = {};
   if (options.body && typeof options.body === "string") {
     defaultHeaders["Content-Type"] = "application/json";
+  }
+
+  const storedAdmin = getStoredAdmin();
+  if (storedAdmin && storedAdmin.token) {
+    defaultHeaders["Authorization"] = `Bearer ${storedAdmin.token}`;
   }
 
   const fetchOptions = {
@@ -25,13 +27,12 @@ async function apiRequest(endpoint, options = {}) {
     response = await fetch(url, fetchOptions);
   } catch (err) {
     const error = new Error(
-      `Falha de conexão com a API (${API_BASE_URL}). Verifique se o servidor backend está em execução.`
+        `Falha de conexão com a API (${API_BASE_URL}). Verifique se o servidor backend está em execução.`
     );
     error.isNetworkError = true;
     throw error;
   }
 
-  // HTTP 204 No Content
   if (response.status === 204) {
     return null;
   }
@@ -54,11 +55,16 @@ async function apiRequest(endpoint, options = {}) {
   }
 
   if (!response.ok) {
-    // Priority: data.mensagem (HTTP 400 RegraNegocioException) > data.erro > status text
+    // Se o token expirou ou for inválido fora da tela de login, encerra a sessão
+    if (response.status === 401 && endpoint !== "/administradores/login") {
+      removeStoredAdmin();
+      window.dispatchEvent(new Event("beergod:unauthorized"));
+    }
+
     const message =
-      (data && data.mensagem) ||
-      (data && data.erro) ||
-      `Erro ${response.status}: ${response.statusText || "Falha na requisição"}`;
+        (data && data.mensagem) ||
+        (data && data.erro) ||
+        `Erro ${response.status}: ${response.statusText || "Falha na requisição"}`;
 
     const error = new Error(message);
     error.status = response.status;

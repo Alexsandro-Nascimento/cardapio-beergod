@@ -72,7 +72,11 @@ function setupGlobalEvents() {
   if (loginForm) {
     loginForm.addEventListener("submit", handleLoginSubmit);
   }
-
+  window.addEventListener("beergod:unauthorized", () => {
+    if (currentAdmin) {
+      handleLogout();
+    }
+  });
   // Logout Button
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {
@@ -169,12 +173,13 @@ async function handleLoginSubmit(e) {
       return;
     }
 
-    // Save { id, nome, email, ativo } to localStorage
+    // Salva os dados + token JWT no localStorage
     setStoredAdmin({
       id: adminData.id,
       nome: adminData.nome,
       email: adminData.email,
       ativo: adminData.ativo,
+      token: adminData.token,
     });
 
     toast.success(`Bem-vindo, ${adminData.nome}!`);
