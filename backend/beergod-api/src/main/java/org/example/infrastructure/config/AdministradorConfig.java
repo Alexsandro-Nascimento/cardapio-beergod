@@ -1,5 +1,7 @@
 package org.example.infrastructure.config;
 
+import org.example.application.security.PasswordHasher;
+import org.example.application.security.TokenService;
 import org.example.application.usecase.*;
 import org.example.domain.repository.AdministradorRepository;
 import org.springframework.context.annotation.Bean;
@@ -9,8 +11,9 @@ import org.springframework.context.annotation.Configuration;
 public class AdministradorConfig {
 
     @Bean
-    public CriarAdministradorUseCase criarAdministradorUseCase(AdministradorRepository repository) {
-        return new CriarAdministradorUseCase(repository);
+    public CriarAdministradorUseCase criarAdministradorUseCase(AdministradorRepository repository,
+                                                               PasswordHasher passwordHasher) {
+        return new CriarAdministradorUseCase(repository, passwordHasher);
     }
 
     @Bean
@@ -19,13 +22,16 @@ public class AdministradorConfig {
     }
 
     @Bean
-    public LoginAdministradorUseCase loginAdministradorUseCase(AdministradorRepository repository) {
-        return new LoginAdministradorUseCase(repository);
+    public LoginAdministradorUseCase loginAdministradorUseCase(AdministradorRepository repository,
+                                                               PasswordHasher passwordHasher,
+                                                               TokenService tokenService) {
+        return new LoginAdministradorUseCase(repository, passwordHasher, tokenService);
     }
 
     @Bean
-    public AtualizarAdministradorUseCase atualizarAdministradorUseCase(AdministradorRepository repository) {
-        return new AtualizarAdministradorUseCase(repository);
+    public AtualizarAdministradorUseCase atualizarAdministradorUseCase(AdministradorRepository repository,
+                                                                       PasswordHasher passwordHasher) {
+        return new AtualizarAdministradorUseCase(repository, passwordHasher);
     }
 
     @Bean

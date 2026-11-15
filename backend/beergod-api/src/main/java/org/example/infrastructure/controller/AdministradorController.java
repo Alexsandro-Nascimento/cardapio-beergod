@@ -44,7 +44,7 @@ public class AdministradorController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AdministradorResponseDTO> login(@RequestBody LoginRequestDTO dto) {
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody LoginRequestDTO dto) {
         return ResponseEntity.ok(loginAdministradorUseCase.executar(dto));
     }
 
