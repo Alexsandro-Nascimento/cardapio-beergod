@@ -39,7 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 administradorRepository.buscarPorEmail(email)
                         .filter(admin -> admin.isAtivo())
                         .ifPresent(admin -> {
-                            var authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                            var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + admin.getPerfil().name()));
                             var authentication = new UsernamePasswordAuthenticationToken(admin, null, authorities);
                             SecurityContextHolder.getContext().setAuthentication(authentication);
                         });

@@ -39,7 +39,6 @@ public class LoginAdministradorUseCase {
         if (passwordHasher.isHashed(admin.getSenha())) {
             senhaValida = passwordHasher.matches(dto.senha(), admin.getSenha());
         } else {
-            // Compatibilidade caso alguma senha tenha sido inserida manualmente via SQL
             senhaValida = admin.getSenha().equals(dto.senha());
             if (senhaValida) {
                 admin.atualizar(admin.getNome(), admin.getEmail(), passwordHasher.hash(dto.senha()), admin.isAtivo());
@@ -58,6 +57,7 @@ public class LoginAdministradorUseCase {
                 admin.getNome(),
                 admin.getEmail(),
                 admin.isAtivo(),
+                admin.getPerfil().name(),
                 token
         );
     }

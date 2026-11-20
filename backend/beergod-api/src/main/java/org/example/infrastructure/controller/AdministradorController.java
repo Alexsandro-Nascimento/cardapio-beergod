@@ -38,7 +38,8 @@ public class AdministradorController {
                 adminCriado.getId(),
                 adminCriado.getNome(),
                 adminCriado.getEmail(),
-                adminCriado.isAtivo()
+                adminCriado.isAtivo(),
+                adminCriado.getPerfil().name()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

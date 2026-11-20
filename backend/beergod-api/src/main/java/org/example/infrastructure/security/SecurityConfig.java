@@ -32,16 +32,28 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) -> {
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.setContentType("application/json;charset=UTF-8");
-                    response.getWriter().write("{\"mensagem\":\"Sessão expirada ou acesso não autorizado. Faça login novamente.\"}");
-                }))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"mensagem\":\"Sessão expirada ou acesso não autorizado. Faça login novamente.\"}");
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"mensagem\":\"Você não tem permissão para realizar esta ação.\"}");
+                        })
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/administradores/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/produtos/**", "/categorias/**", "/bebidas/**").permitAll()
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers("/administradores/**").hasRole("ADMIN_MASTER")
+                        .requestMatchers(HttpMethod.DELETE, "/categorias/**").hasRole("ADMIN_MASTER")
+                        .requestMatchers(HttpMethod.POST, "/categorias/**", "/produtos/**").hasAnyRole("ADMIN_MASTER", "ADMIN_BEBIDAS", "ADMIN_COZINHA")
+                        .requestMatchers(HttpMethod.PUT, "/categorias/**", "/produtos/**").hasAnyRole("ADMIN_MASTER", "ADMIN_BEBIDAS", "ADMIN_COZINHA")
+                        .requestMatchers(HttpMethod.DELETE, "/produtos/**").hasAnyRole("ADMIN_MASTER", "ADMIN_BEBIDAS", "ADMIN_COZINHA")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

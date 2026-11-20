@@ -184,6 +184,7 @@ export async function criarAdministrador(adminData) {
       nome: adminData.nome?.trim(),
       email: adminData.email?.trim(),
       senha: adminData.senha,
+      perfil: adminData.perfil || "ADMIN_MASTER",
     }),
   });
 }
@@ -199,6 +200,7 @@ export async function atualizarAdministrador(id, adminData) {
       email: adminData.email?.trim(),
       senha: senha,
       ativo: adminData.ativo,
+      perfil: adminData.perfil || null,
     }),
   });
 }

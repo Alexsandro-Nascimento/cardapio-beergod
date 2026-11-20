@@ -4,6 +4,7 @@ public record AdministradorResponseDTO(
         Long id,
         String nome,
         String email,
-        boolean ativo
+        boolean ativo,
+        String perfil
 ) {
 }

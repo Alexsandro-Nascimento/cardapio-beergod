@@ -19,7 +19,8 @@ public class ListarAdministradoresUseCase {
                         admin.getId(),
                         admin.getNome(),
                         admin.getEmail(),
-                        admin.isAtivo()
+                        admin.isAtivo(),
+                        admin.getPerfil().name()
                 ))
                 .toList();
     }

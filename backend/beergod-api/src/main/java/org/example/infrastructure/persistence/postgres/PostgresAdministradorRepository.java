@@ -1,6 +1,7 @@
 package org.example.infrastructure.persistence.postgres;
 
 import org.example.domain.model.Administrador;
+import org.example.domain.model.PerfilAdministrador;
 import org.example.domain.repository.AdministradorRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -19,7 +20,8 @@ public class PostgresAdministradorRepository implements AdministradorRepository 
             rs.getString("nome"),
             rs.getString("email"),
             rs.getString("senha"),
-            rs.getBoolean("ativo")
+            rs.getBoolean("ativo"),
+            PerfilAdministrador.fromString(rs.getString("perfil"))
     );
 
     public PostgresAdministradorRepository(JdbcTemplate jdbcTemplate) {
@@ -28,43 +30,45 @@ public class PostgresAdministradorRepository implements AdministradorRepository 
 
     @Override
     public void salvar(Administrador administrador) {
-        String sql = "INSERT INTO administradores (nome, email, senha, ativo) VALUES (?, ?, ?, ?)";
-        jdbcTemplate.update(
-                sql,
-                administrador.getNome(),
-                administrador.getEmail(),
-                administrador.getSenha(),
-                administrador.isAtivo()
-        );
-    }
-
-    @Override
-    public List<Administrador> listarTodos() {
-        String sql = "SELECT id, nome, email, senha, ativo FROM administradores ORDER BY id";
-        return jdbcTemplate.query(sql, rowMapper);
-    }
-
-    @Override
-    public Optional<Administrador> buscarPorEmail(String email) {
-        String sql = "SELECT id, nome, email, senha, ativo FROM administradores WHERE email = ?";
-        return jdbcTemplate.query(sql, rowMapper, email).stream().findFirst();
-    }
-
-    @Override
-    public Optional<Administrador> buscarPorId(Long id) {
-        String sql = "SELECT id, nome, email, senha, ativo FROM administradores WHERE id = ?";
-        return jdbcTemplate.query(sql, rowMapper, id).stream().findFirst();
-    }
-
-    @Override
-    public void atualizar(Administrador administrador) {
-        String sql = "UPDATE administradores SET nome = ?, email = ?, senha = ?, ativo = ? WHERE id = ?";
+        String sql = "INSERT INTO administradores (nome, email, senha, ativo, perfil) VALUES (?, ?, ?, ?, ?)";
         jdbcTemplate.update(
                 sql,
                 administrador.getNome(),
                 administrador.getEmail(),
                 administrador.getSenha(),
                 administrador.isAtivo(),
+                administrador.getPerfil().name()
+        );
+    }
+
+    @Override
+    public List<Administrador> listarTodos() {
+        String sql = "SELECT id, nome, email, senha, ativo, perfil FROM administradores ORDER BY id";
+        return jdbcTemplate.query(sql, rowMapper);
+    }
+
+    @Override
+    public Optional<Administrador> buscarPorEmail(String email) {
+        String sql = "SELECT id, nome, email, senha, ativo, perfil FROM administradores WHERE email = ?";
+        return jdbcTemplate.query(sql, rowMapper, email).stream().findFirst();
+    }
+
+    @Override
+    public Optional<Administrador> buscarPorId(Long id) {
+        String sql = "SELECT id, nome, email, senha, ativo, perfil FROM administradores WHERE id = ?";
+        return jdbcTemplate.query(sql, rowMapper, id).stream().findFirst();
+    }
+
+    @Override
+    public void atualizar(Administrador administrador) {
+        String sql = "UPDATE administradores SET nome = ?, email = ?, senha = ?, ativo = ?, perfil = ? WHERE id = ?";
+        jdbcTemplate.update(
+                sql,
+                administrador.getNome(),
+                administrador.getEmail(),
+                administrador.getSenha(),
+                administrador.isAtivo(),
+                administrador.getPerfil().name(),
                 administrador.getId()
         );
     }
