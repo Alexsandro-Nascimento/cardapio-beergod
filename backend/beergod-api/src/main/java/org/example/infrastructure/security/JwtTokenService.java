@@ -29,6 +29,7 @@ public class JwtTokenService implements TokenService {
                     .withSubject(admin.getEmail())
                     .withClaim("id", admin.getId())
                     .withClaim("nome", admin.getNome())
+                    .withClaim("perfil", admin.getPerfil().name())
                     .withExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
                     .sign(algorithm);
         } catch (JWTCreationException exception) {

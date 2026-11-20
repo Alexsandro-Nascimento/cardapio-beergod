@@ -27,7 +27,7 @@ import {
 import { toast } from "./toast.js";
 
 /* ==========================================================================
-   State Management
+   State Management & Role Helpers
    ========================================================================== */
 let currentAdmin = null;
 let activeTab = "produtos"; // "produtos" | "categorias" | "administradores"
@@ -52,6 +52,35 @@ let produtoStatusFilter = "all";
 let categoriaSearch = "";
 let adminSearch = "";
 
+const PERFIL_LABELS = {
+  ADMIN_MASTER: "Admin Master",
+  ADMIN_BEBIDAS: "Admin Bebidas",
+  ADMIN_COZINHA: "Admin Cozinha",
+  FUNCIONARIO: "Funcionário",
+};
+
+function getCurrentPerfil() {
+  return currentAdmin?.perfil || "ADMIN_MASTER";
+}
+
+function isMaster() {
+  return getCurrentPerfil() === "ADMIN_MASTER";
+}
+
+function isFuncionario() {
+  return getCurrentPerfil() === "FUNCIONARIO";
+}
+
+function canManageProduto(prod) {
+  const perfil = getCurrentPerfil();
+  if (perfil === "ADMIN_MASTER") return true;
+  if (perfil === "FUNCIONARIO") return false;
+  const isBebida = prod.tipo === "BEBIDA";
+  if (perfil === "ADMIN_BEBIDAS") return isBebida;
+  if (perfil === "ADMIN_COZINHA") return !isBebida;
+  return false;
+}
+
 /* ==========================================================================
    Initialization
    ========================================================================== */
@@ -72,11 +101,13 @@ function setupGlobalEvents() {
   if (loginForm) {
     loginForm.addEventListener("submit", handleLoginSubmit);
   }
+
   window.addEventListener("beergod:unauthorized", () => {
     if (currentAdmin) {
       handleLogout();
     }
   });
+
   // Logout Button
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {
@@ -118,7 +149,6 @@ function showLoginView() {
   if (loginView) loginView.classList.remove("hidden");
   if (dashboardView) dashboardView.classList.add("hidden");
 
-  // Reset form
   const loginForm = document.getElementById("login-form");
   if (loginForm) loginForm.reset();
 }
@@ -132,11 +162,45 @@ function showDashboardView() {
   if (loginView) loginView.classList.add("hidden");
   if (dashboardView) dashboardView.classList.remove("hidden");
 
-  // Display admin info in header
+  // Display admin info and role in header
   const adminNameEl = document.getElementById("header-admin-name");
   const adminEmailEl = document.getElementById("header-admin-email");
+  const adminRoleEl = document.getElementById("header-admin-role");
+
   if (adminNameEl && currentAdmin) adminNameEl.textContent = currentAdmin.nome;
   if (adminEmailEl && currentAdmin) adminEmailEl.textContent = currentAdmin.email;
+  if (adminRoleEl && currentAdmin) {
+    adminRoleEl.textContent = PERFIL_LABELS[getCurrentPerfil()] || getCurrentPerfil();
+  }
+
+  // Aba Administradores: visível apenas para ADMIN_MASTER
+  const adminTabBtn = document.querySelector('[data-tab-target="administradores"]');
+  if (adminTabBtn) {
+    adminTabBtn.classList.toggle("hidden", !isMaster());
+  }
+  if (!isMaster() && activeTab === "administradores") {
+    activeTab = "produtos";
+  }
+
+  // Botão Novo Produto e Checkbox Mestre: ocultos para FUNCIONARIO
+  const openNewProdBtn = document.getElementById("open-new-produto-btn");
+  if (openNewProdBtn) {
+    openNewProdBtn.classList.toggle("hidden", isFuncionario());
+  }
+
+  const selectAllCb = document.getElementById("select-all-produtos");
+  if (selectAllCb) {
+    selectAllCb.classList.toggle("hidden", isFuncionario());
+  }
+
+  // Card Nova Categoria: oculto para FUNCIONARIO (expande a tabela para largura total)
+  const quickCatCard = document.getElementById("quick-categoria-card");
+  const catListCard = document.getElementById("categorias-list-card");
+  if (quickCatCard && catListCard) {
+    quickCatCard.classList.toggle("hidden", isFuncionario());
+    catListCard.classList.toggle("lg:col-span-2", !isFuncionario());
+    catListCard.classList.toggle("lg:col-span-3", isFuncionario());
+  }
 
   // Load initial tab data
   switchTab(activeTab);
@@ -173,12 +237,12 @@ async function handleLoginSubmit(e) {
       return;
     }
 
-    // Salva os dados + token JWT no localStorage
     setStoredAdmin({
       id: adminData.id,
       nome: adminData.nome,
       email: adminData.email,
       ativo: adminData.ativo,
+      perfil: adminData.perfil || "ADMIN_MASTER",
       token: adminData.token,
     });
 
@@ -196,6 +260,7 @@ async function handleLoginSubmit(e) {
 function handleLogout() {
   removeStoredAdmin();
   currentAdmin = null;
+  activeTab = "produtos";
   toast.info("Sessão finalizada com sucesso.");
   showLoginView();
 }
@@ -204,18 +269,25 @@ function handleLogout() {
    Tab Navigation
    ========================================================================== */
 function switchTab(tabName) {
+  if (tabName === "administradores" && !isMaster()) {
+    tabName = "produtos";
+  }
+
   activeTab = tabName;
 
   // Update tab buttons style
   const tabButtons = document.querySelectorAll("[data-tab-target]");
   tabButtons.forEach((btn) => {
-    const isTarget = btn.getAttribute("data-tab-target") === tabName;
+    const target = btn.getAttribute("data-tab-target");
+    if (target === "administradores" && !isMaster()) return;
+
+    const isTarget = target === tabName;
     if (isTarget) {
       btn.className =
-        "flex items-center gap-2 py-3 px-4 border-b-2 border-amber-500 text-amber-400 font-bold text-sm transition-all";
+          "flex items-center gap-2 py-3.5 px-3 border-b-2 border-amber-500 text-amber-400 font-bold text-sm transition-all whitespace-nowrap cursor-pointer";
     } else {
       btn.className =
-        "flex items-center gap-2 py-3 px-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm transition-all";
+          "flex items-center gap-2 py-3.5 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm transition-all whitespace-nowrap cursor-pointer";
     }
   });
 
@@ -256,7 +328,6 @@ async function loadProdutosData() {
   }
 
   try {
-    // Load both products and categories (for select options and category names)
     const [prods, cats] = await Promise.all([getProdutos(false), getCategorias(false)]);
 
     produtosList = Array.isArray(prods) ? prods : [];
@@ -271,7 +342,7 @@ async function loadProdutosData() {
     toast.error(err.message || "Erro ao carregar lista de produtos.");
     if (tableBody) {
       tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-400 font-semibold">${escapeHtml(
-        err.message
+          err.message
       )}</td></tr>`;
     }
   }
@@ -287,40 +358,39 @@ function populateCategorySelectOptions() {
   const filterSelect = document.getElementById("produto-category-filter");
 
   if (select) {
-    select.innerHTML = `<option value="">Selecione uma categoria...</option>` +
-      categoriasList
-        .filter((c) => c.ativo)
-        .map((c) => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`)
-        .join("");
+    select.innerHTML =
+        `<option value="">Selecione uma categoria...</option>` +
+        categoriasList
+            .filter((c) => c.ativo)
+            .map((c) => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`)
+            .join("");
   }
 
   if (filterSelect) {
-    filterSelect.innerHTML = `<option value="all">Todas as Categorias</option>` +
-      categoriasList
-        .map((c) => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`)
-        .join("");
+    filterSelect.innerHTML =
+        `<option value="all">Todas as Categorias</option>` +
+        categoriasList
+            .map((c) => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`)
+            .join("");
   }
 }
 
 function getFilteredProdutos() {
   return produtosList.filter((prod) => {
-    // Search by name, brand, or category
     const matchSearch =
-      produtoSearch === "" ||
-      prod.nome.toLowerCase().includes(produtoSearch) ||
-      (prod.descricao && prod.descricao.toLowerCase().includes(produtoSearch)) ||
-      (prod.marca && prod.marca.toLowerCase().includes(produtoSearch)) ||
-      (prod.categoriaNome && prod.categoriaNome.toLowerCase().includes(produtoSearch));
+        produtoSearch === "" ||
+        prod.nome.toLowerCase().includes(produtoSearch) ||
+        (prod.descricao && prod.descricao.toLowerCase().includes(produtoSearch)) ||
+        (prod.marca && prod.marca.toLowerCase().includes(produtoSearch)) ||
+        (prod.categoriaNome && prod.categoriaNome.toLowerCase().includes(produtoSearch));
 
-    // Category filter
     const matchCat =
-      produtoCategoryFilter === "all" || String(prod.categoriaId) === String(produtoCategoryFilter);
+        produtoCategoryFilter === "all" || String(prod.categoriaId) === String(produtoCategoryFilter);
 
-    // Status filter
     const matchStatus =
-      produtoStatusFilter === "all" ||
-      (produtoStatusFilter === "ativos" && prod.ativo) ||
-      (produtoStatusFilter === "inativos" && !prod.ativo);
+        produtoStatusFilter === "all" ||
+        (produtoStatusFilter === "ativos" && prod.ativo) ||
+        (produtoStatusFilter === "inativos" && !prod.ativo);
 
     return matchSearch && matchCat && matchStatus;
   });
@@ -335,24 +405,26 @@ function updateBatchActionsBar(filtered = null) {
   if (countEl) countEl.textContent = totalSelected;
 
   if (bar) {
-    if (totalSelected > 0) {
+    if (totalSelected > 0 && !isFuncionario()) {
       bar.classList.remove("hidden");
     } else {
       bar.classList.add("hidden");
     }
   }
 
-  if (selectAll) {
+  if (selectAll && !isFuncionario()) {
     if (!filtered) filtered = getFilteredProdutos();
-    if (filtered.length === 0) {
+    const manageable = filtered.filter((p) => canManageProduto(p));
+
+    if (manageable.length === 0) {
       selectAll.checked = false;
       selectAll.indeterminate = false;
     } else {
-      const selectedFilteredCount = filtered.filter((p) => selectedProdutoIds.has(p.id)).length;
+      const selectedFilteredCount = manageable.filter((p) => selectedProdutoIds.has(p.id)).length;
       if (selectedFilteredCount === 0) {
         selectAll.checked = false;
         selectAll.indeterminate = false;
-      } else if (selectedFilteredCount === filtered.length) {
+      } else if (selectedFilteredCount === manageable.length) {
         selectAll.checked = true;
         selectAll.indeterminate = false;
       } else {
@@ -370,7 +442,7 @@ async function executeBatchUpdate(changes, successActionText) {
   try {
     const promises = ids.map((id) => {
       const prod = produtosList.find((p) => p.id === id);
-      if (!prod) return Promise.resolve();
+      if (!prod || !canManageProduto(prod)) return Promise.resolve();
 
       const isBebida = prod.tipo === "BEBIDA";
       const payload = {
@@ -429,26 +501,32 @@ function renderProdutosTable() {
 
   // Desktop Table Rows
   tableBody.innerHTML = filtered
-    .map((prod) => {
-      const isBebida = prod.tipo === "BEBIDA";
-      const isSelected = selectedProdutoIds.has(prod.id);
-      const imageSrc = prod.imagemUrl && prod.imagemUrl.trim().length > 0
-        ? escapeHtml(prod.imagemUrl)
-        : getPlaceholderImage(prod.nome, isBebida);
+      .map((prod) => {
+        const isBebida = prod.tipo === "BEBIDA";
+        const canEdit = canManageProduto(prod);
+        const isSelected = canEdit && selectedProdutoIds.has(prod.id);
+        const imageSrc =
+            prod.imagemUrl && prod.imagemUrl.trim().length > 0
+                ? escapeHtml(prod.imagemUrl)
+                : getPlaceholderImage(prod.nome, isBebida);
 
-      return `
+        return `
       <tr class="border-b border-slate-700/60 hover:bg-slate-800/50 transition-colors ${
-        isSelected ? "bg-amber-500/10" : ""
-      }">
+            isSelected ? "bg-amber-500/10" : ""
+        }">
         <!-- Checkbox Selection -->
         <td class="w-10 py-3 px-4 text-center">
-          <input
-            type="checkbox"
-            data-produto-id="${prod.id}"
-            class="produto-row-checkbox w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700 cursor-pointer accent-amber-500"
-            ${isSelected ? "checked" : ""}
-            title="Selecionar produto"
-          />
+          ${
+            canEdit
+                ? `<input
+                  type="checkbox"
+                  data-produto-id="${prod.id}"
+                  class="produto-row-checkbox w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700 cursor-pointer accent-amber-500"
+                  ${isSelected ? "checked" : ""}
+                  title="Selecionar produto"
+                />`
+                : `<span class="text-slate-600 text-xs" title="Somente leitura">&bull;</span>`
+        }
         </td>
 
         <!-- Image & Name -->
@@ -471,14 +549,14 @@ function renderProdutosTable() {
         <td class="py-3 px-4">
           ${
             isBebida
-              ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                   Bebida
                 </span>`
-              : `<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-700/60 text-slate-300 border border-slate-600/40">
+                : `<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-700/60 text-slate-300 border border-slate-600/40">
                   Produto
                 </span>`
-          }
+        }
         </td>
 
         <!-- Category -->
@@ -492,14 +570,14 @@ function renderProdutosTable() {
         <td class="py-3 px-4 text-xs">
           ${
             isBebida
-              ? `
+                ? `
               <div class="flex flex-col gap-0.5">
                 <span class="font-semibold text-slate-200">${escapeHtml(prod.marca || "-")}</span>
                 <span class="text-slate-400 font-mono">${prod.tamanhoML ? `${prod.tamanhoML}ml` : "-"}</span>
               </div>
             `
-              : `<span class="text-slate-500">-</span>`
-          }
+                : `<span class="text-slate-500">-</span>`
+        }
         </td>
 
         <!-- Price -->
@@ -513,87 +591,98 @@ function renderProdutosTable() {
         <td class="py-3 px-4">
           ${
             prod.ativo
-              ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   Ativo
                 </span>`
-              : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
                   <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
                   Inativo
                 </span>`
-          }
+        }
         </td>
 
         <!-- Actions -->
         <td class="py-3 px-4 text-right">
-          <div class="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onclick="window.openEditProdutoModal(${prod.id})"
-              class="p-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-700/60 transition-colors"
-              title="Editar Produto"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-
-            ${
-              prod.ativo
+          ${
+            canEdit
                 ? `
-              <button
-                type="button"
-                onclick="window.confirmInativarProduto(${prod.id})"
-                class="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
-                title="Inativar Produto"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>`
-                : `
-              <button
-                type="button"
-                onclick="window.confirmReativarProduto(${prod.id})"
-                class="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
-                title="Reativar Produto"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>`
-            }
-          </div>
+              <div class="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onclick="window.openEditProdutoModal(${prod.id})"
+                  class="p-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-700/60 transition-colors cursor-pointer"
+                  title="Editar Produto"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+
+                ${
+                    prod.ativo
+                        ? `
+                  <button
+                    type="button"
+                    onclick="window.confirmInativarProduto(${prod.id})"
+                    class="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    title="Inativar Produto"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>`
+                        : `
+                  <button
+                    type="button"
+                    onclick="window.confirmReativarProduto(${prod.id})"
+                    class="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                    title="Reativar Produto"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>`
+                }
+              </div>`
+                : `<span class="text-[11px] text-slate-500 italic">Somente leitura</span>`
+        }
         </td>
       </tr>
       `;
-    })
-    .join("");
+      })
+      .join("");
 
   // Mobile Cards View
   if (mobileCardsContainer) {
     mobileCardsContainer.innerHTML = filtered
-      .map((prod) => {
-        const isBebida = prod.tipo === "BEBIDA";
-        const isSelected = selectedProdutoIds.has(prod.id);
-        const imageSrc = prod.imagemUrl && prod.imagemUrl.trim().length > 0
-          ? escapeHtml(prod.imagemUrl)
-          : getPlaceholderImage(prod.nome, isBebida);
+        .map((prod) => {
+          const isBebida = prod.tipo === "BEBIDA";
+          const canEdit = canManageProduto(prod);
+          const isSelected = canEdit && selectedProdutoIds.has(prod.id);
+          const imageSrc =
+              prod.imagemUrl && prod.imagemUrl.trim().length > 0
+                  ? escapeHtml(prod.imagemUrl)
+                  : getPlaceholderImage(prod.nome, isBebida);
 
-        return `
+          return `
         <div class="p-4 rounded-xl bg-slate-800/80 border border-slate-700 flex flex-col gap-3 ${
-          isSelected ? "ring-2 ring-amber-500/60 bg-amber-500/5" : ""
-        }">
+              isSelected ? "ring-2 ring-amber-500/60 bg-amber-500/5" : ""
+          }">
           <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
-            <label class="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                data-produto-id="${prod.id}"
-                class="produto-row-checkbox w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700 cursor-pointer accent-amber-500"
-                ${isSelected ? "checked" : ""}
-              />
-              <span class="text-xs font-semibold text-slate-300">Selecionar item</span>
-            </label>
+            ${
+              canEdit
+                  ? `<label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      data-produto-id="${prod.id}"
+                      class="produto-row-checkbox w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700 cursor-pointer accent-amber-500"
+                      ${isSelected ? "checked" : ""}
+                    />
+                    <span class="text-xs font-semibold text-slate-300">Selecionar item</span>
+                  </label>`
+                  : `<span class="text-[11px] text-slate-500 italic">Somente leitura</span>`
+          }
             <span class="font-extrabold text-amber-400 font-serif-brand text-sm">${formatBRL(prod.preco)}</span>
           </div>
 
@@ -610,40 +699,44 @@ function renderProdutosTable() {
               <div class="flex items-center gap-2 mt-2">
                 <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">${escapeHtml(prod.categoriaNome || "Geral")}</span>
                 ${
-                  prod.ativo
-                    ? `<span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold">Ativo</span>`
-                    : `<span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold">Inativo</span>`
-                }
+              prod.ativo
+                  ? `<span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold">Ativo</span>`
+                  : `<span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold">Inativo</span>`
+          }
               </div>
             </div>
           </div>
 
-          <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-700/60">
-            <button
-              type="button"
-              onclick="window.openEditProdutoModal(${prod.id})"
-              class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
-            >
-              Editar
-            </button>
-            ${
-              prod.ativo
-                ? `<button
+          ${
+              canEdit
+                  ? `<div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-700/60">
+                  <button
                     type="button"
-                    onclick="window.confirmInativarProduto(${prod.id})"
-                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 transition-colors"
-                  >Inativar</button>`
-                : `<button
-                    type="button"
-                    onclick="window.confirmReativarProduto(${prod.id})"
-                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-colors"
-                  >Reativar</button>`
-            }
-          </div>
+                    onclick="window.openEditProdutoModal(${prod.id})"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                  >
+                    Editar
+                  </button>
+                  ${
+                      prod.ativo
+                          ? `<button
+                          type="button"
+                          onclick="window.confirmInativarProduto(${prod.id})"
+                          class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 transition-colors"
+                        >Inativar</button>`
+                          : `<button
+                          type="button"
+                          onclick="window.confirmReativarProduto(${prod.id})"
+                          class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-colors"
+                        >Reativar</button>`
+                  }
+                </div>`
+                  : ""
+          }
         </div>
       `;
-      })
-      .join("");
+        })
+        .join("");
   }
 
   // Row checkbox change listeners
@@ -656,12 +749,10 @@ function renderProdutosTable() {
         selectedProdutoIds.delete(id);
       }
 
-      // Sync checkbox state between desktop and mobile if rendered simultaneously
       document.querySelectorAll(`.produto-row-checkbox[data-produto-id="${id}"]`).forEach((el) => {
         el.checked = e.target.checked;
       });
 
-      // Highlight row if desktop
       const tr = e.target.closest("tr");
       if (tr) {
         if (e.target.checked) {
@@ -679,7 +770,6 @@ function renderProdutosTable() {
 }
 
 function setupProductFormEvents() {
-  // Search and filter inputs
   const searchInput = document.getElementById("produto-search-input");
   const catFilter = document.getElementById("produto-category-filter");
   const statusFilter = document.getElementById("produto-status-filter");
@@ -705,7 +795,6 @@ function setupProductFormEvents() {
     });
   }
 
-  // Open modal button
   const openNewBtn = document.getElementById("open-new-produto-btn");
   if (openNewBtn) {
     openNewBtn.addEventListener("click", () => {
@@ -713,13 +802,11 @@ function setupProductFormEvents() {
     });
   }
 
-  // Close modal buttons
   const closeBtn = document.getElementById("close-produto-modal-btn");
   const cancelBtn = document.getElementById("cancel-produto-modal-btn");
   if (closeBtn) closeBtn.addEventListener("click", closeProdutoModal);
   if (cancelBtn) cancelBtn.addEventListener("click", closeProdutoModal);
 
-  // Switch "É uma Bebida?" dynamic toggle
   const isBebidaCheckbox = document.getElementById("produto-isBebida");
   const bebidaFields = document.getElementById("bebida-specific-fields");
   const tamanhoInput = document.getElementById("produto-tamanhoML");
@@ -739,7 +826,6 @@ function setupProductFormEvents() {
     });
   }
 
-  // Live image preview
   const imageUrlInput = document.getElementById("produto-imagemUrl");
   const imagePreview = document.getElementById("produto-preview-img");
   if (imageUrlInput && imagePreview) {
@@ -756,30 +842,30 @@ function setupProductFormEvents() {
     });
   }
 
-  // Form Submit (Create or Update)
   const form = document.getElementById("produto-form");
   if (form) {
     form.addEventListener("submit", handleProdutoSubmit);
   }
 
-  // Setup Batch Actions Events
   setupBatchActionsEvents();
 }
 
 function setupBatchActionsEvents() {
-  // Master checkbox
   const selectAll = document.getElementById("select-all-produtos");
   if (selectAll) {
     selectAll.addEventListener("change", (e) => {
       const isChecked = e.target.checked;
       const filtered = getFilteredProdutos();
-      filtered.forEach((p) => {
+      const manageable = filtered.filter((p) => canManageProduto(p));
+
+      manageable.forEach((p) => {
         if (isChecked) {
           selectedProdutoIds.add(p.id);
         } else {
           selectedProdutoIds.delete(p.id);
         }
       });
+
       document.querySelectorAll(".produto-row-checkbox").forEach((cb) => {
         const id = Number(cb.getAttribute("data-produto-id"));
         cb.checked = selectedProdutoIds.has(id);
@@ -789,11 +875,11 @@ function setupBatchActionsEvents() {
           else tr.classList.remove("bg-amber-500/10");
         }
       });
+
       updateBatchActionsBar(filtered);
     });
   }
 
-  // Deselect all button
   const deselectBtn = document.getElementById("batch-deselect-all-btn");
   if (deselectBtn) {
     deselectBtn.addEventListener("click", () => {
@@ -807,7 +893,6 @@ function setupBatchActionsEvents() {
     });
   }
 
-  // Batch Alterar Preço
   const alterarPrecoBtn = document.getElementById("batch-alterar-preco-btn");
   const modal = document.getElementById("batch-preco-modal");
   const form = document.getElementById("batch-preco-form");
@@ -849,17 +934,16 @@ function setupBatchActionsEvents() {
     });
   }
 
-  // Batch Ativar
   const ativarBtn = document.getElementById("batch-ativar-btn");
   if (ativarBtn) {
     ativarBtn.addEventListener("click", async () => {
       if (selectedProdutoIds.size === 0) return;
       const count = selectedProdutoIds.size;
       const confirmed = await openConfirmDialog(
-        "Ativar em Lote",
-        `Deseja ativar os ${count} produto(s) selecionado(s)?`,
-        "Ativar Todos",
-        "success"
+          "Ativar em Lote",
+          `Deseja ativar os ${count} produto(s) selecionado(s)?`,
+          "Ativar Todos",
+          "success"
       );
       if (confirmed) {
         await executeBatchUpdate({ ativo: true }, `Ativado(s) com sucesso`);
@@ -867,17 +951,16 @@ function setupBatchActionsEvents() {
     });
   }
 
-  // Batch Inativar
   const inativarBtn = document.getElementById("batch-inativar-btn");
   if (inativarBtn) {
     inativarBtn.addEventListener("click", async () => {
       if (selectedProdutoIds.size === 0) return;
       const count = selectedProdutoIds.size;
       const confirmed = await openConfirmDialog(
-        "Inativar em Lote",
-        `Deseja inativar os ${count} produto(s) selecionado(s)? Eles não aparecerão mais no cardápio público dos clientes.`,
-        "Inativar Todos",
-        "danger"
+          "Inativar em Lote",
+          `Deseja inativar os ${count} produto(s) selecionado(s)? Eles não aparecerão mais no cardápio público dos clientes.`,
+          "Inativar Todos",
+          "danger"
       );
       if (confirmed) {
         await executeBatchUpdate({ ativo: false }, `Inativado(s) com sucesso`);
@@ -887,6 +970,11 @@ function setupBatchActionsEvents() {
 }
 
 function openProdutoModal(productId = null) {
+  if (isFuncionario()) {
+    toast.warning("Seu perfil possui apenas permissão de visualização.");
+    return;
+  }
+
   editingProdutoId = productId;
   const modal = document.getElementById("produto-modal");
   const form = document.getElementById("produto-form");
@@ -897,13 +985,18 @@ function openProdutoModal(productId = null) {
   const tamanhoInput = document.getElementById("produto-tamanhoML");
   const marcaInput = document.getElementById("produto-marca");
   const imagePreview = document.getElementById("produto-preview-img");
+  const perfil = getCurrentPerfil();
 
   form.reset();
 
   if (productId) {
-    // Editing existing product
     const product = produtosList.find((p) => p.id === productId);
     if (!product) return;
+
+    if (!canManageProduto(product)) {
+      toast.warning("Você não tem permissão para editar este item.");
+      return;
+    }
 
     titleEl.textContent = "Editar Produto / Bebida";
     if (ativoContainer) ativoContainer.classList.remove("hidden");
@@ -917,6 +1010,7 @@ function openProdutoModal(productId = null) {
 
     const isBebida = product.tipo === "BEBIDA";
     isBebidaCheckbox.checked = isBebida;
+    isBebidaCheckbox.disabled = perfil !== "ADMIN_MASTER";
 
     if (isBebida) {
       bebidaFields.classList.remove("hidden");
@@ -934,17 +1028,31 @@ function openProdutoModal(productId = null) {
       imagePreview.src = product.imagemUrl || getPlaceholderImage(product.nome, isBebida);
     }
   } else {
-    // Creating new product
     titleEl.textContent = "Cadastrar Novo Produto";
     if (ativoContainer) ativoContainer.classList.add("hidden");
 
-    isBebidaCheckbox.checked = false;
-    bebidaFields.classList.add("hidden");
-    tamanhoInput.removeAttribute("required");
-    marcaInput.removeAttribute("required");
+    if (perfil === "ADMIN_BEBIDAS") {
+      isBebidaCheckbox.checked = true;
+      isBebidaCheckbox.disabled = true;
+      bebidaFields.classList.remove("hidden");
+      tamanhoInput.setAttribute("required", "required");
+      marcaInput.setAttribute("required", "required");
+    } else if (perfil === "ADMIN_COZINHA") {
+      isBebidaCheckbox.checked = false;
+      isBebidaCheckbox.disabled = true;
+      bebidaFields.classList.add("hidden");
+      tamanhoInput.removeAttribute("required");
+      marcaInput.removeAttribute("required");
+    } else {
+      isBebidaCheckbox.checked = false;
+      isBebidaCheckbox.disabled = false;
+      bebidaFields.classList.add("hidden");
+      tamanhoInput.removeAttribute("required");
+      marcaInput.removeAttribute("required");
+    }
 
     if (imagePreview) {
-      imagePreview.src = getPlaceholderImage("BeerGod", false);
+      imagePreview.src = getPlaceholderImage("BeerGod", isBebidaCheckbox.checked);
     }
   }
 
@@ -1007,13 +1115,15 @@ window.openEditProdutoModal = function (id) {
 
 window.confirmInativarProduto = async function (id) {
   const product = produtosList.find((p) => p.id === id);
-  const nome = product ? product.nome : "este produto";
+  if (!product || !canManageProduto(product)) return;
+
+  const nome = product.nome || "este produto";
 
   const confirmed = await openConfirmDialog(
-    "Inativar Produto",
-    `Tem certeza que deseja inativar o produto "${nome}"? Ele não aparecerá mais no cardápio público dos clientes.`,
-    "Inativar",
-    "danger"
+      "Inativar Produto",
+      `Tem certeza que deseja inativar o produto "${nome}"? Ele não aparecerá mais no cardápio público dos clientes.`,
+      "Inativar",
+      "danger"
   );
 
   if (confirmed) {
@@ -1029,7 +1139,7 @@ window.confirmInativarProduto = async function (id) {
 
 window.confirmReativarProduto = async function (id) {
   const product = produtosList.find((p) => p.id === id);
-  if (!product) return;
+  if (!product || !canManageProduto(product)) return;
 
   try {
     const isBebida = product.tipo === "BEBIDA";
@@ -1057,7 +1167,7 @@ window.confirmReativarProduto = async function (id) {
 async function loadCategoriasData() {
   const tableBody = document.getElementById("categorias-table-body");
   if (tableBody) {
-    tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-400">Carregando categorias...</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-400">Carregando categorias...</td></tr>`;
   }
 
   try {
@@ -1089,7 +1199,7 @@ function renderCategoriasTable() {
   if (filtered.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="4" class="text-center py-10 text-slate-400">
+        <td colspan="5" class="text-center py-10 text-slate-400">
           Nenhuma categoria cadastrada.
         </td>
       </tr>
@@ -1097,11 +1207,65 @@ function renderCategoriasTable() {
     return;
   }
 
-  tableBody.innerHTML = filtered
-    .map((cat) => {
-      const prodCount = produtosList.filter((p) => p.categoriaId === cat.id).length;
+  const readOnly = isFuncionario();
+  const master = isMaster();
 
-      return `
+  tableBody.innerHTML = filtered
+      .map((cat) => {
+        const prodCount = produtosList.filter((p) => p.categoriaId === cat.id).length;
+
+        let actionsHtml = `<span class="text-[11px] text-slate-500 italic">Somente leitura</span>`;
+
+        if (!readOnly) {
+          const editBtn = `
+          <button
+            type="button"
+            onclick="window.openEditCategoriaModal(${cat.id})"
+            class="p-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-700/60 transition-colors cursor-pointer"
+            title="Editar Categoria"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+        `;
+
+          let statusToggleBtn = "";
+          if (master) {
+            statusToggleBtn = cat.ativo
+                ? `
+              <button
+                type="button"
+                onclick="window.confirmInativarCategoria(${cat.id})"
+                class="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                title="Inativar Categoria"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>`
+                : `
+              <button
+                type="button"
+                onclick="window.confirmReativarCategoria(${cat.id})"
+                class="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                title="Reativar Categoria"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>`;
+          }
+
+          actionsHtml = `
+          <div class="flex items-center justify-end gap-2">
+            ${editBtn}
+            ${statusToggleBtn}
+          </div>
+        `;
+        }
+
+        return `
       <tr class="border-b border-slate-700/60 hover:bg-slate-800/50 transition-colors">
         <td class="py-3.5 px-4 font-mono text-xs text-slate-400">#${cat.id}</td>
         <td class="py-3.5 px-4 font-semibold text-slate-100">${escapeHtml(cat.nome)}</td>
@@ -1113,64 +1277,26 @@ function renderCategoriasTable() {
         <td class="py-3.5 px-4">
           ${
             cat.ativo
-              ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   Ativa
                 </span>`
-              : `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                : `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
                   <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
                   Inativa
                 </span>`
-          }
+        }
         </td>
         <td class="py-3.5 px-4 text-right">
-          <div class="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onclick="window.openEditCategoriaModal(${cat.id})"
-              class="p-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-700/60 transition-colors"
-              title="Editar Categoria"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-
-            ${
-              cat.ativo
-                ? `
-              <button
-                type="button"
-                onclick="window.confirmInativarCategoria(${cat.id})"
-                class="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
-                title="Inativar Categoria"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>`
-                : `
-              <button
-                type="button"
-                onclick="window.confirmReativarCategoria(${cat.id})"
-                class="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
-                title="Reativar Categoria"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>`
-            }
-          </div>
+          ${actionsHtml}
         </td>
       </tr>
     `;
-    })
-    .join("");
+      })
+      .join("");
 }
 
 function setupCategoryFormEvents() {
-  // Search
   const searchInput = document.getElementById("categoria-search-input");
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
@@ -1179,11 +1305,12 @@ function setupCategoryFormEvents() {
     });
   }
 
-  // Quick Create Form
   const quickForm = document.getElementById("quick-categoria-form");
   if (quickForm) {
     quickForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (isFuncionario()) return;
+
       const nomeInput = quickForm.nome;
       const nome = nomeInput.value.trim();
       if (!nome) {
@@ -1202,7 +1329,6 @@ function setupCategoryFormEvents() {
     });
   }
 
-  // Edit Modal events
   const closeBtn = document.getElementById("close-categoria-modal-btn");
   const cancelBtn = document.getElementById("cancel-categoria-modal-btn");
   if (closeBtn) closeBtn.addEventListener("click", closeCategoriaModal);
@@ -1215,6 +1341,8 @@ function setupCategoryFormEvents() {
 }
 
 function openEditCategoriaModal(id) {
+  if (isFuncionario()) return;
+
   const cat = categoriasList.find((c) => c.id === id);
   if (!cat) return;
 
@@ -1263,14 +1391,16 @@ window.openEditCategoriaModal = function (id) {
 };
 
 window.confirmInativarCategoria = async function (id) {
+  if (!isMaster()) return;
+
   const cat = categoriasList.find((c) => c.id === id);
   const nome = cat ? cat.nome : "esta categoria";
 
   const confirmed = await openConfirmDialog(
-    "Inativar Categoria",
-    `Tem certeza que deseja inativar a categoria "${nome}"?`,
-    "Inativar",
-    "danger"
+      "Inativar Categoria",
+      `Tem certeza que deseja inativar a categoria "${nome}"?`,
+      "Inativar",
+      "danger"
   );
 
   if (confirmed) {
@@ -1285,6 +1415,8 @@ window.confirmInativarCategoria = async function (id) {
 };
 
 window.confirmReativarCategoria = async function (id) {
+  if (!isMaster()) return;
+
   const cat = categoriasList.find((c) => c.id === id);
   if (!cat) return;
 
@@ -1298,12 +1430,14 @@ window.confirmReativarCategoria = async function (id) {
 };
 
 /* ==========================================================================
-   ABA 3: ADMINISTRADORES
+   ABA 3: ADMINISTRADORES (Exclusivo ADMIN_MASTER)
    ========================================================================== */
 async function loadAdministradoresData() {
+  if (!isMaster()) return;
+
   const tableBody = document.getElementById("admins-table-body");
   if (tableBody) {
-    tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-400">Carregando lista de administradores...</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-400">Carregando lista de administradores...</td></tr>`;
   }
 
   try {
@@ -1331,16 +1465,16 @@ function renderAdministradoresTable() {
 
   const filtered = administradoresList.filter((admin) => {
     return (
-      adminSearch === "" ||
-      admin.nome.toLowerCase().includes(adminSearch) ||
-      admin.email.toLowerCase().includes(adminSearch)
+        adminSearch === "" ||
+        admin.nome.toLowerCase().includes(adminSearch) ||
+        admin.email.toLowerCase().includes(adminSearch)
     );
   });
 
   if (filtered.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="5" class="text-center py-10 text-slate-400">
+        <td colspan="6" class="text-center py-10 text-slate-400">
           Nenhum administrador encontrado.
         </td>
       </tr>
@@ -1349,44 +1483,50 @@ function renderAdministradoresTable() {
   }
 
   tableBody.innerHTML = filtered
-    .map((admin) => {
-      const isSelf = currentLoggedId && admin.id === currentLoggedId;
+      .map((admin) => {
+        const isSelf = currentLoggedId && admin.id === currentLoggedId;
+        const perfilLabel = PERFIL_LABELS[admin.perfil] || admin.perfil || "Admin Master";
 
-      return `
+        return `
       <tr class="border-b border-slate-700/60 hover:bg-slate-800/50 transition-colors ${
-        isSelf ? "bg-amber-500/5" : ""
-      }">
+            isSelf ? "bg-amber-500/5" : ""
+        }">
         <td class="py-3.5 px-4 font-mono text-xs text-slate-400">#${admin.id}</td>
         <td class="py-3.5 px-4">
           <div class="flex items-center gap-2">
             <span class="font-bold text-slate-100">${escapeHtml(admin.nome)}</span>
             ${
-              isSelf
+            isSelf
                 ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500 text-slate-950 uppercase">Você</span>`
                 : ""
-            }
+        }
           </div>
         </td>
         <td class="py-3.5 px-4 font-mono text-xs text-slate-300">${escapeHtml(admin.email)}</td>
         <td class="py-3.5 px-4">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-800 text-amber-300 border border-slate-700">
+            ${escapeHtml(perfilLabel)}
+          </span>
+        </td>
+        <td class="py-3.5 px-4">
           ${
             admin.ativo
-              ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   Ativo
                 </span>`
-              : `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                : `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
                   <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
                   Inativo
                 </span>`
-          }
+        }
         </td>
         <td class="py-3.5 px-4 text-right">
           <div class="flex items-center justify-end gap-2">
             <button
               type="button"
               onclick="window.openEditAdminModal(${admin.id})"
-              class="p-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-700/60 transition-colors"
+              class="p-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-700/60 transition-colors cursor-pointer"
               title="Editar Administrador"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1395,12 +1535,12 @@ function renderAdministradoresTable() {
             </button>
 
             ${
-              admin.ativo
+            admin.ativo
                 ? `
               <button
                 type="button"
                 onclick="window.confirmInativarAdmin(${admin.id})"
-                class="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
+                class="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
                 title="Inativar Administrador"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1411,20 +1551,20 @@ function renderAdministradoresTable() {
               <button
                 type="button"
                 onclick="window.confirmReativarAdmin(${admin.id})"
-                class="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                class="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors cursor-pointer"
                 title="Reativar Administrador"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>`
-            }
+        }
           </div>
         </td>
       </tr>
     `;
-    })
-    .join("");
+      })
+      .join("");
 }
 
 function setupAdminFormEvents() {
@@ -1436,7 +1576,6 @@ function setupAdminFormEvents() {
     });
   }
 
-  // Open New Admin Modal
   const openNewBtn = document.getElementById("open-new-admin-btn");
   if (openNewBtn) {
     openNewBtn.addEventListener("click", () => {
@@ -1444,13 +1583,11 @@ function setupAdminFormEvents() {
     });
   }
 
-  // Close Modal Buttons
   const closeBtn = document.getElementById("close-admin-modal-btn");
   const cancelBtn = document.getElementById("cancel-admin-modal-btn");
   if (closeBtn) closeBtn.addEventListener("click", closeAdminModal);
   if (cancelBtn) cancelBtn.addEventListener("click", closeAdminModal);
 
-  // Form Submit
   const form = document.getElementById("admin-form");
   if (form) {
     form.addEventListener("submit", handleAdminSubmit);
@@ -1458,6 +1595,8 @@ function setupAdminFormEvents() {
 }
 
 function openAdminModal(adminId = null) {
+  if (!isMaster()) return;
+
   editingAdminId = adminId;
   const modal = document.getElementById("admin-modal");
   const form = document.getElementById("admin-form");
@@ -1475,14 +1614,18 @@ function openAdminModal(adminId = null) {
     titleEl.textContent = "Editar Administrador";
     form.nome.value = admin.nome;
     form.email.value = admin.email;
+    if (form.perfil) form.perfil.value = admin.perfil || "ADMIN_MASTER";
     form.ativo.checked = admin.ativo;
 
     senhaInput.removeAttribute("required");
     senhaInput.placeholder = "Deixe em branco para manter a senha atual";
-    if (senhaHint) senhaHint.textContent = "Deixe em branco para manter a senha atual (mínimo 6 dígitos ao alterar).";
+    if (senhaHint) {
+      senhaHint.textContent = "Deixe em branco para manter a senha atual (mínimo 6 dígitos ao alterar).";
+    }
     if (ativoContainer) ativoContainer.classList.remove("hidden");
   } else {
     titleEl.textContent = "Cadastrar Novo Administrador";
+    if (form.perfil) form.perfil.value = "ADMIN_MASTER";
     senhaInput.setAttribute("required", "required");
     senhaInput.placeholder = "Senha de acesso (mínimo 6 caracteres)";
     if (senhaHint) senhaHint.textContent = "A senha deve conter no mínimo 6 caracteres.";
@@ -1506,6 +1649,7 @@ async function handleAdminSubmit(e) {
 
   const nome = form.nome.value.trim();
   const email = form.email.value.trim();
+  const perfil = form.perfil ? form.perfil.value : "ADMIN_MASTER";
   const senha = form.senha.value;
   const ativo = form.ativo ? form.ativo.checked : true;
 
@@ -1534,17 +1678,17 @@ async function handleAdminSubmit(e) {
         email,
         senha: senha && senha.trim().length > 0 ? senha : null,
         ativo,
+        perfil,
       });
 
-      // If updating current logged in admin, update stored session
       if (currentAdmin && currentAdmin.id === editingAdminId) {
-        setStoredAdmin({ ...currentAdmin, nome, email, ativo });
+        setStoredAdmin({ ...currentAdmin, nome, email, ativo, perfil });
         showDashboardView();
       }
 
       toast.success("Administrador atualizado com sucesso!");
     } else {
-      await criarAdministrador({ nome, email, senha });
+      await criarAdministrador({ nome, email, senha, perfil });
       toast.success("Administrador cadastrado com sucesso!");
     }
 
@@ -1571,18 +1715,18 @@ window.confirmInativarAdmin = async function (id) {
 
   if (isSelf) {
     const warningConfirmed = await openConfirmDialog(
-      "Atenção: Inativar a própria conta",
-      "Você está prestes a inativar a conta que está usando no momento! Se continuar, perderá acesso ao painel após sair.",
-      "Inativar mesmo assim",
-      "danger"
+        "Atenção: Inativar a própria conta",
+        "Você está prestes a inativar a conta que está usando no momento! Se continuar, perderá acesso ao painel após sair.",
+        "Inativar mesmo assim",
+        "danger"
     );
     if (!warningConfirmed) return;
   } else {
     const confirmed = await openConfirmDialog(
-      "Inativar Administrador",
-      `Tem certeza que deseja inativar o administrador "${nome}"?`,
-      "Inativar",
-      "danger"
+        "Inativar Administrador",
+        `Tem certeza que deseja inativar o administrador "${nome}"?`,
+        "Inativar",
+        "danger"
     );
     if (!confirmed) return;
   }
@@ -1606,6 +1750,7 @@ window.confirmReativarAdmin = async function (id) {
       email: admin.email,
       senha: null,
       ativo: true,
+      perfil: admin.perfil || null,
     });
     toast.success(`Administrador "${admin.nome}" reativado com sucesso!`);
     await loadAdministradoresData();
@@ -1621,12 +1766,12 @@ function openConfirmDialog(title, message, confirmText = "Confirmar", theme = "d
   return new Promise((resolve) => {
     const modalBackdrop = document.createElement("div");
     modalBackdrop.className =
-      "fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 modal-backdrop";
+        "fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 modal-backdrop";
 
     const confirmColorClass =
-      theme === "danger"
-        ? "bg-rose-600 hover:bg-rose-500 text-white"
-        : "bg-amber-500 hover:bg-amber-400 text-slate-950";
+        theme === "danger"
+            ? "bg-rose-600 hover:bg-rose-500 text-white"
+            : "bg-amber-500 hover:bg-amber-400 text-slate-950";
 
     modalBackdrop.innerHTML = `
       <div class="relative w-full max-w-md overflow-hidden rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-6">

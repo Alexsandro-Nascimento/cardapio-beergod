@@ -1,5 +1,6 @@
 package org.example.infrastructure.config;
 
+import org.example.application.security.ContextoAutenticacao;
 import org.example.application.usecase.AtualizarProdutoUseCase;
 import org.example.application.usecase.CriarProdutoUseCase;
 import org.example.application.usecase.InativarProdutoUseCase;
@@ -14,8 +15,9 @@ public class ProdutoConfig {
 
     @Bean
     public CriarProdutoUseCase criarProdutoUseCase(ProdutoRepository produtoRepository,
-                                                   CategoriaRepository categoriaRepository) {
-        return new CriarProdutoUseCase(produtoRepository, categoriaRepository);
+                                                   CategoriaRepository categoriaRepository,
+                                                   ContextoAutenticacao contextoAutenticacao) {
+        return new CriarProdutoUseCase(produtoRepository, categoriaRepository, contextoAutenticacao);
     }
 
     @Bean
@@ -26,12 +28,14 @@ public class ProdutoConfig {
 
     @Bean
     public AtualizarProdutoUseCase atualizarProdutoUseCase(ProdutoRepository produtoRepository,
-                                                           CategoriaRepository categoriaRepository) {
-        return new AtualizarProdutoUseCase(produtoRepository, categoriaRepository);
+                                                           CategoriaRepository categoriaRepository,
+                                                           ContextoAutenticacao contextoAutenticacao) {
+        return new AtualizarProdutoUseCase(produtoRepository, categoriaRepository, contextoAutenticacao);
     }
 
     @Bean
-    public InativarProdutoUseCase inativarProdutoUseCase(ProdutoRepository produtoRepository) {
-        return new InativarProdutoUseCase(produtoRepository);
+    public InativarProdutoUseCase inativarProdutoUseCase(ProdutoRepository produtoRepository,
+                                                         ContextoAutenticacao contextoAutenticacao) {
+        return new InativarProdutoUseCase(produtoRepository, contextoAutenticacao);
     }
 }

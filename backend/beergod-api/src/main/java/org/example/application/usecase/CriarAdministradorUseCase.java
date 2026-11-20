@@ -4,6 +4,7 @@ import org.example.application.dto.CriarAdministradorDTO;
 import org.example.application.security.PasswordHasher;
 import org.example.domain.exception.RegraNegocioException;
 import org.example.domain.model.Administrador;
+import org.example.domain.model.PerfilAdministrador;
 import org.example.domain.repository.AdministradorRepository;
 
 public class CriarAdministradorUseCase {
@@ -21,11 +22,11 @@ public class CriarAdministradorUseCase {
             throw new RegraNegocioException("Já existe um administrador cadastrado com este e-mail!");
         }
 
-        // Valida regras da senha em texto puro (mínimo 6 caracteres) antes de gerar o hash
-        new Administrador(dto.nome(), dto.email(), dto.senha());
+        PerfilAdministrador perfil = PerfilAdministrador.fromString(dto.perfil());
+        new Administrador(dto.nome(), dto.email(), dto.senha(), perfil);
 
         String senhaCriptografada = passwordHasher.hash(dto.senha());
-        Administrador novo = new Administrador(dto.nome(), dto.email(), senhaCriptografada);
+        Administrador novo = new Administrador(dto.nome(), dto.email(), senhaCriptografada, perfil);
         repository.salvar(novo);
 
         return repository.buscarPorEmail(novo.getEmail()).orElse(novo);

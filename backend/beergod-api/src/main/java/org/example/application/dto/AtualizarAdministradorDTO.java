@@ -4,6 +4,7 @@ public record AtualizarAdministradorDTO(
         String nome,
         String email,
         String senha,
-        Boolean ativo
+        Boolean ativo,
+        String perfil
 ) {
 }
